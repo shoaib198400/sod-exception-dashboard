@@ -1989,14 +1989,14 @@ def render_header(subtitle: str = "") -> None:
                                  Uses Master Logo.jpg if available, then Title.png, then pure-CSS.
       2. Dark-blue info strip: app title, subtitle, date/time.
     """
-        # Remove server time, use JS for user local time
-        now_js = '''<div id="localtime" style="margin-top:4px;font-size:18px;"></div>
-        <script>
-            var now = new Date();
-            var date = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-            var time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-            document.getElementById('localtime').innerHTML = date + ' | ' + time;
-        </script>'''
+    # Remove server time, use JS for user local time
+    now_js = '''<div id="localtime" style="margin-top:4px;font-size:18px;"></div>
+    <script>
+        var now = new Date();
+        var date = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        var time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        document.getElementById('localtime').innerHTML = date + ' | ' + time;
+    </script>'''
     subtitle_html = f'<p class="dash-header-sub">{subtitle}</p>' if subtitle else ""
 
     # ── Part 1: Full-width brand banner ─────────────────────────────────────
