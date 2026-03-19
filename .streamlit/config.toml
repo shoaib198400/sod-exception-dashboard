@@ -1,2 +1,8 @@
+[theme]
+base = "light"
+primaryColor = "#0A3D62"
+backgroundColor = "#F7F9FC"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#000000"
 [ui]
 toolbarMode = "minimal"

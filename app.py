@@ -622,9 +622,12 @@ def load_zone_master() -> pd.DataFrame:
 def _load_excel_from_path(path: str) -> pd.DataFrame:
     """Internal helper: load any Excel file from a disk path (cached)."""
     ext = os.path.splitext(path)[1].lower()
-    df = _read_excel_flexible(path, ext_hint=ext)
-    df.columns = df.columns.str.strip().str.upper()
-    return df
+    try:
+        df = _read_excel_flexible(path, ext_hint=ext)
+        df.columns = df.columns.str.strip().str.upper()
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 
 def _read_excel_flexible(source, ext_hint: str = "") -> pd.DataFrame:
@@ -4005,30 +4008,36 @@ def render_pending_dc_details(
     summary_df   = pending_dc_result.get("summary_df",   pd.DataFrame())
     zone_summary = pending_dc_result.get("zone_summary",  pd.DataFrame())
     detail_df    = pending_dc_result.get("detail_df",    pd.DataFrame())
+    # Safety check for Pending DC result
+    if (
+        pending_dc_result is None or
+        (isinstance(pending_dc_result, dict) and (summary_df is None or summary_df.empty))
+    ):
+        st.warning("No Pending DC data available")
+        return
     col1, col2 = st.columns([2, 1])
-    with col1:
-        total_dc   = pending_dc_result.get("total_count", 0)
-        s_df       = pending_dc_result.get("summary_df", pd.DataFrame())
-        z_df       = pending_dc_result.get("zone_summary", pd.DataFrame())
-        detail_str = f"{len(z_df)} zones  |  {len(s_df)} plants affected"
-        color_cls  = "c-danger" if total_dc > 50 else ("c-warning" if total_dc > 20 else "")
-        clicked_dc = kpi_card(
-            label       = "Pending DC's",
-            value       = total_dc,
-            detail      = detail_str,
-            icon        = "&#128666;",
-            color_class = color_cls,
-            key         = "tile_pending_dc",
-        )
-        if clicked_dc:
-            st.session_state["page"] = "pending_dc_details"
-            st.rerun()
-    with col2:
-        try:
-            dq = detail_df["QUANTITY"].sum()
-            st.metric("Total Qty (L)", f"{dq:,.0f}")
-        except Exception:
-            st.metric("Total Qty (L)", "N/A")
+    # Always define columns before use, no 'with col1:'
+    total_dc   = pending_dc_result.get("total_count", 0)
+    s_df       = pending_dc_result.get("summary_df", pd.DataFrame())
+    z_df       = pending_dc_result.get("zone_summary", pd.DataFrame())
+    detail_str = f"{len(z_df)} zones  |  {len(s_df)} plants affected"
+    color_cls  = "c-danger" if total_dc > 50 else ("c-warning" if total_dc > 20 else "")
+    clicked_dc = kpi_card(
+        label       = "Pending DC's",
+        value       = total_dc,
+        detail      = detail_str,
+        icon        = "&#128666;",
+    color_class = color_cls,
+    key         = "tile_pending_dc",
+    )
+    if clicked_dc:
+        st.session_state["page"] = "pending_dc_details"
+        st.rerun()
+    try:
+        dq = detail_df["QUANTITY"].sum()
+        st.metric("Total Qty (L)", f"{dq:,.0f}")
+    except Exception:
+        st.metric("Total Qty (L)", "N/A")
 
     st.markdown("---")
 
@@ -5361,90 +5370,94 @@ def main() -> None:
     # Page router
     page = st.session_state.get("page", "dashboard")
 
-    if page == "dashboard":
-        render_dashboard(
-            df_plant,
-            pending_dc_result,
-            open_delivery_result,
-            open_intransit_result,
-            open_sales_orders_result,
-            pending_invoices_result,
-            tank_reco_result,
-            open_short_sales_result,
-            open_short_sto_result,
-            all_exception_plant_df,
-            zone_exception_summary_df,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "pending_dc_details":
-        render_pending_dc_details(pending_dc_result, selected_zones, selected_plants)
-    elif page == "open_delivery_details":
-        render_open_delivery_details(open_delivery_result, selected_zones, selected_plants)
-    elif page == "open_intransit_details":
-        render_open_intransit_details(open_intransit_result, selected_zones, selected_plants)
-    elif page == "open_sales_orders_details":
-        render_open_sales_orders_details(open_sales_orders_result, selected_zones, selected_plants)
-    elif page == "pending_invoices_details":
-        render_pending_invoices_details(pending_invoices_result, selected_zones, selected_plants)
-    elif page == "tank_reco_details":
-        render_tank_reco_details(tank_reco_result, selected_zones, selected_plants)
-    elif page == "open_shortages_sales_details":
-        render_open_shortages_sales_details(open_short_sales_result, selected_zones, selected_plants)
-    elif page == "open_shortages_sto_details":
-        render_open_shortages_sto_details(open_short_sto_result, selected_zones, selected_plants)
-    elif page == "zone_exception_drilldown":
-        render_zone_exception_drilldown(
-            zone_exception_summary_df,
-            all_exception_plant_df,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "top_exception_zones":
-        render_top_exception_zones_page(
-            zone_exception_summary_df,
-            all_exception_plant_df,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "top_exception_locations":
-        render_top_exception_locations_page(
-            all_exception_plant_df,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "top_shortage_zones":
-        render_top_shortage_zones_page(
-            shortage_zone_summary_df,
-            shortage_location_summary_df,
-            combined_shortage_detail_df,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "top_shortage_locations":
-        render_top_shortage_locations_page(
-            shortage_location_summary_df,
-            combined_shortage_detail_df,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "top_short_sales_vehicles":
-        render_top_short_sales_vehicles_page(
-            short_sales_vehicle_summary_df,
-            open_short_sales_result,
-            selected_zones,
-            selected_plants,
-        )
-    elif page == "top_short_sto_vehicles":
-        render_top_short_sto_vehicles_page(
-            short_sto_vehicle_summary_df,
-            open_short_sto_result,
-            selected_zones,
-            selected_plants,
-        )
-    else:
-        st.session_state["page"] = "dashboard"
-        st.rerun()
+    try:
+        if page == "dashboard":
+            render_dashboard(
+                df_plant,
+                pending_dc_result,
+                open_delivery_result,
+                open_intransit_result,
+                open_sales_orders_result,
+                pending_invoices_result,
+                tank_reco_result,
+                open_short_sales_result,
+                open_short_sto_result,
+                all_exception_plant_df,
+                zone_exception_summary_df,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "pending_dc_details":
+            render_pending_dc_details(pending_dc_result, selected_zones, selected_plants)
+        elif page == "open_delivery_details":
+            render_open_delivery_details(open_delivery_result, selected_zones, selected_plants)
+        elif page == "open_intransit_details":
+            render_open_intransit_details(open_intransit_result, selected_zones, selected_plants)
+        elif page == "open_sales_orders_details":
+            render_open_sales_orders_details(open_sales_orders_result, selected_zones, selected_plants)
+        elif page == "pending_invoices_details":
+            render_pending_invoices_details(pending_invoices_result, selected_zones, selected_plants)
+        elif page == "tank_reco_details":
+            render_tank_reco_details(tank_reco_result, selected_zones, selected_plants)
+        elif page == "open_shortages_sales_details":
+            render_open_shortages_sales_details(open_short_sales_result, selected_zones, selected_plants)
+        elif page == "open_shortages_sto_details":
+            render_open_shortages_sto_details(open_short_sto_result, selected_zones, selected_plants)
+        elif page == "zone_exception_drilldown":
+            render_zone_exception_drilldown(
+                zone_exception_summary_df,
+                all_exception_plant_df,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "top_exception_zones":
+            render_top_exception_zones_page(
+                zone_exception_summary_df,
+                all_exception_plant_df,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "top_exception_locations":
+            render_top_exception_locations_page(
+                all_exception_plant_df,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "top_shortage_zones":
+            render_top_shortage_zones_page(
+                shortage_zone_summary_df,
+                shortage_location_summary_df,
+                combined_shortage_detail_df,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "top_shortage_locations":
+            render_top_shortage_locations_page(
+                shortage_location_summary_df,
+                combined_shortage_detail_df,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "top_short_sales_vehicles":
+            render_top_short_sales_vehicles_page(
+                short_sales_vehicle_summary_df,
+                open_short_sales_result,
+                selected_zones,
+                selected_plants,
+            )
+        elif page == "top_short_sto_vehicles":
+            render_top_short_sto_vehicles_page(
+                short_sto_vehicle_summary_df,
+                open_short_sto_result,
+                selected_zones,
+                selected_plants,
+            )
+        else:
+            st.session_state["page"] = "dashboard"
+            st.rerun()
+    except Exception as e:
+        st.error("Module failed to load")
+        st.exception(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
